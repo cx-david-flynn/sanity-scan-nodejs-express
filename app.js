@@ -4,6 +4,8 @@ const multer = require('multer');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -31,11 +33,84 @@ app.get('/query', (req, res) => {
   res.send(query);
 });
 
-// GET request with path parameters:
+// GET requests with path parameters:
 app.get('/path/:id', (req, res) => {
   const id = req.params.id;
   res.send(`Path parameter: ${id}`);
 });
+
+// Request URL: http://localhost:3000/users/34/books/8989
+// req.params: { "userId": "34", "bookId": "8989" }
+app.get('/users/:userId/books/:bookId', (req, res) => {
+  res.send(req.params)
+})
+
+// Request URL: http://localhost:3000/flights/LAX-SFO
+// req.params: { "from": "LAX", "to": "SFO" }
+app.get('/flights/:from-:to', (req, res) => {
+  res.send(req.params)
+})
+
+// Request URL: http://localhost:3000/plantae/Prunus.persica
+// req.params: { "genus": "Prunus", "species": "persica" }
+app.get('/plantae/:genus.:species', (req, res) => {
+  res.send(req.params)
+})
+
+// Request URL: http://localhost:3000/user/42
+// req.params: {"userId": "42"}
+app.get('/user/:userId(\d+)', (req, res) => {
+  res.send(req.params)
+})
+
+// GET request with Schema:
+const User = new Schema({
+  username: {
+    type: String,
+    required: [
+      true, 'Username is required.'
+    ],
+    unique: true
+  },
+  password: {
+    type: String,
+    select: false
+  }
+});
+
+function listAdmin(req, res) {
+  return User.find({})
+      .select('-social')
+      .exec()
+      .then(notFound(res))
+      .then(result(res))
+      .catch(error(res));
+}
+
+function notFound(res) {
+  return function(data) {
+    if (!data) {
+      res.status(404).send('Not found');
+    }
+    return data;
+  };
+}
+
+function result(res) {
+  return function(data) {
+    res.json(data);
+  };
+}
+
+function error(res) {
+  return function(err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  };
+}
+
+
+app.get('/api/user/admin', listAdmin);
 
 // POST request:
 app.post('/post', (req, res) => {
@@ -80,6 +155,118 @@ const logMiddleware = (req, res, next) => {
 };
 
 app.use(logMiddleware);
+
+// app.all case:
+app.all('/secret', (req, res, next) => {
+  console.log('Accessing the secret section ...')
+  next() // pass control to the next handler
+})
+
+// app.route case:
+app.route('/events')
+    .all(function (req, res, next) {
+      // runs for all HTTP verbs first
+      // think of it as route specific middleware!
+    })
+    .get(function (req, res, next) {
+      res.json({})
+    })
+    .post(function (req, res, next) {
+      // maybe add a new event...
+    })
+
+// String patterns in URL:
+// Route path matches 'acd' and 'abcd'
+app.get('/ab?cd', (req, res) => {
+  res.send('ab?cd')
+})
+
+// Matches 'abcd', 'abbcd', 'abbbcd' and so on
+app.get('/ab+cd', (req, res) => {
+  res.send('ab+cd')
+})
+
+// Matches 'abcd', 'abRANDOMcd' and so on
+app.get('/ab*cd', (req, res) => {
+  res.send('ab*cd')
+})
+
+// Matches 'abe' and 'abcde'
+app.get('/ab(cd)?e', (req, res) => {
+  res.send('ab(cd)?e')
+})
+
+// Regex in URL:
+// Matches anything with "a" in it
+app.get(/a/, (req, res) => {
+  res.send('/a/')
+})
+
+// Matches 'dragonfly' and 'butterfly'
+app.get(/.*fly$/, (req, res) => {
+  res.send('/.*fly$/')
+})
+
+// Array of URLs:
+// Matches paths starting with the passed strings
+app.use(['/abcd', '/xyza', /\/lmn|\/pqr/], function (req, res, next) {
+  res.send('Hello World')
+})
+
+// Callback function:
+app.get('/example/b', (req, res, next) => {
+  console.log('the response will be sent by the next function ...')
+  next()
+}, (req, res) => {
+  res.send('Hello from B!')
+})
+
+// Array of callback functions:
+const cb0 = function (req, res, next) {
+  console.log('CB0')
+  next()
+}
+
+const cb1 = function (req, res, next) {
+  console.log('CB1')
+  next()
+}
+
+const cb2 = function (req, res) {
+  res.send('Hello from C!')
+}
+
+app.get('/example/c', [cb0, cb1, cb2])
+
+// Combination of arrays and independent functions:
+const c2b0 = function (req, res, next) {
+  console.log('C2B0')
+  next()
+}
+
+const c2b1 = function (req, res, next) {
+  console.log('C2B1')
+  next()
+}
+
+app.get('/example/d', [c2b0, c2b1], (req, res, next) => {
+  console.log('the response will be sent by the next function ...')
+  next()
+}, (req, res) => {
+  res.send('Hello from D!')
+})
+
+// Chainable route handler:
+app.route('/book')
+    .get((req, res) => {
+      res.send('Get a random book')
+    })
+    .post((req, res) => {
+      res.send('Add a book')
+    })
+    .put((req, res) => {
+      res.send('Update the book')
+    })
 
 // Serving static files:
 app.use('/static', express.static(path.join(__dirname, 'public')));
@@ -162,6 +349,63 @@ app.use('/api', userRouter);
 app.get('/template', (req, res) => {
   res.render('template', { title: 'EJS Template', message: 'Hello from EJS' });
 });
+
+// Content types:
+app.get('/ct1', (req, res) => {
+  res.json(null)
+  res.json({ user: 'tobi' })
+  res.status(500).json({ error: 'message' })
+})
+
+app.get('/ct2', (req, res) => {
+  res.jsonp({ user: 'tobi' })
+  res.status(500).jsonp({ error: 'message' })
+})
+
+app.get('/ct3', (req, res) => {
+  res.set('Content-Type', 'text/html')
+  res.send(Buffer.from('<p>some html</p>'))
+})
+
+app.get('/ct4', (req, res) => {
+  res.append('Content-Type', 'text/html')
+  res.send(Buffer.from('<p>some html</p>'))
+})
+
+app.get('/ct5', (req, res) => {
+  res.type('.html')
+  res.send(Buffer.from('<p>some html</p>'))
+})
+
+app.get('/ct6', (req, res) => {
+  res.format({
+    'text/plain': function () {
+      res.send('hey')
+    },
+
+    'text/html': function () {
+      res.send('<p>hey</p>')
+    },
+
+    'application/json': function () {
+      res.send({ message: 'hey' })
+    },
+
+    default: function () {
+      // log the request and respond with 406
+      res.status(406).send('Not Acceptable')
+    }
+  })
+})
+
+// Status codes:
+app.get('/sc1', (req, res) => {
+  res.sendStatus(404)
+})
+
+app.get('/sc2', (req, res) => {
+  res.status(400).send('Bad Request')
+})
 
 // Middleware for error handling:
 app.use((err, req, res, next) => {
