@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
+const { exec } = require('child_process');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -406,6 +407,38 @@ app.get('/sc1', (req, res) => {
 app.get('/sc2', (req, res) => {
   res.status(400).send('Bad Request')
 })
+
+// Command injection:
+app.get('/api/run-command', (req, res) => {
+  const command = req.query.command;
+  // Danger lurks here! We're directly using user-supplied input in the command.
+  // An attacker can exploit this by injecting malicious commands, potentially compromising the server.
+  // Always validate and sanitize user input, especially when it involves executing commands.
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Command execution failed: ${error}`);
+      return res.status(500).json({ error: 'Command execution failed' });
+    }
+
+    return res.status(200).json({ output: stdout });
+  });
+});
+
+// Log forging:
+app.get('/api/log-forging', (req, res) => {
+  const user = req.query.user;
+  const logEntry = `User ${user} accessed the API.`;
+
+  // Vulnerability: Log Forging
+  // Here, we're directly concatenating user input into the log message without proper validation or sanitization.
+  // An attacker can manipulate the "user" query parameter to inject special characters or newline characters,
+  // potentially creating forged log entries or even executing arbitrary code in some cases.
+
+  console.log(logEntry); // Logging the potentially manipulated log entry
+
+  return res.status(200).json({ message: 'Log entry created' });
+});
 
 // Middleware for error handling:
 app.use((err, req, res, next) => {
