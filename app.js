@@ -28,6 +28,16 @@ app.get('/', (req, res) => {
   res.send('Welcome to the home page');
 });
 
+// GET request without parameters:
+app.get('/example/get', (req, res) => {
+  res.send('Welcome to the home page');
+});
+
+// POST method route
+app.post('/example/post', (req, res) => {
+  res.send('POST request to the example route');
+});
+
 // GET request with query parameters:
 app.get('/query', (req, res) => {
   const query = req.query;
