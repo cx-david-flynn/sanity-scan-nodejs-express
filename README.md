@@ -14,3 +14,16 @@ Before running the application, ensure you have the following installed on your 
 npm install
 npm start
 ```
+
+## Containerize
+Execute from the folder
+```
+docker build -t <image name>:<tag>
+```
+docker build -t sanity-scan-nodejs:latest
+
+## Run Container
+```
+docker run -d --rm -p 3000:3000 --name <containername> <imagename>
+```
+docker run -d --rm -p 3000:3000 --name sanity-scan sanity-scan-nodejs:latest
